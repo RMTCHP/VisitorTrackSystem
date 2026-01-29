@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ข้อกำหนดและเงื่อนไข - RMT Visitor Track System</title>
 
-  <!-- PDF.js (render PDF เป็น canvas เพื่อให้ตรวจจับการ scroll ได้จริง) -->
+  <!-- PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.min.js"></script>
 
   <style>
@@ -38,10 +38,7 @@
       gap: 10px;
     }
 
-    .company-logo {
-      height: 40px;
-      width: auto;
-    }
+    .company-logo { height: 40px; width: auto; }
 
     .company-name {
       font-size: 22px;
@@ -93,9 +90,11 @@
       max-height: 350px;
       overflow-y: auto;
       white-space: normal;
+
+      /* ✅ FIX #1: ชิดซ้ายแน่นอน (ไม่โดน text-align:center ของ main-container) */
+      text-align: left;
     }
 
-    /* ✅ จัดระยะบรรทัดและย่อหน้าให้เรียบ */
     .content-text p,
     .content-text li {
       line-height: 1.75;
@@ -115,14 +114,8 @@
       line-height: 1.6;
     }
 
-    .content-text ul {
-      margin-left: 2em;
-      padding-left: 0;
-    }
-
-    .content-text li::marker {
-      color: #2563eb;
-    }
+    .content-text ul { margin-left: 2em; padding-left: 0; }
+    .content-text li::marker { color: #2563eb; }
 
     .consent-button {
       width: 100%;
@@ -192,11 +185,7 @@
       box-shadow: 0 6px 16px rgba(0,0,0,0.08);
     }
 
-    .pdf-loading {
-      font-size: 14px;
-      color: #475569;
-      padding: 10px 6px;
-    }
+    .pdf-loading { font-size: 14px; color: #475569; padding: 10px 6px; }
 
     .step-badge {
       display: inline-block;
@@ -210,15 +199,12 @@
       margin-bottom: 10px;
     }
 
-    /* Animation */
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(30px); }
       to { opacity: 1; transform: translateY(0); }
     }
-
     .header, .main-container { animation: fadeInUp 0.6s ease-out; }
 
-    /* 📱 Responsive */
     @media (max-width: 480px) {
       .main-container { padding: 20px 18px; }
       .content-text { font-size: 14px; padding: 16px; line-height: 1.7; max-height: 320px; }
@@ -241,7 +227,7 @@
   <div class="main-container">
     <h1 class="main-title">ข้อกำหนดและเงื่อนไข</h1>
 
-    <!-- ===== STEP 1: TEXT TERMS (เหมือนเดิม) ===== -->
+    <!-- ===== STEP 1 ===== -->
     <div id="step1">
       <div class="step-badge">Step 1/2: อ่านเงื่อนไขเบื้องต้น</div>
 
@@ -329,7 +315,6 @@
         </p>
       </div>
 
-      <!-- ปุ่ม Step1 -->
       <button id="nextBtn" class="consent-button" onclick="goToPdf()" disabled>
         หน้าถัดไป
       </button>
@@ -337,7 +322,7 @@
       <div id="scrollNotice1">⚠️ กรุณาเลื่อนอ่านเงื่อนไขจนสุดก่อนกดหน้าถัดไป</div>
     </div>
 
-    <!-- ===== STEP 2: PDF VIEW ===== -->
+    <!-- ===== STEP 2 ===== -->
     <div id="step2" style="display:none;">
       <div class="step-badge">Step 2/2: อ่านเอกสาร PDF ให้ครบก่อนยินยอม</div>
 
@@ -360,17 +345,13 @@
   </div>
 
   <script>
-    // ==========================
-    // CONFIG
-    // ==========================
     const PDF_URL = "data/policy-cn.pdf";
 
-    // PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.js";
 
     // ==========================
-    // STEP 1: ต้อง scroll ข้อความให้สุดก่อนกด "หน้าถัดไป"
+    // STEP 1 unlock (รองรับทั้ง scroll ในกล่อง และ scroll ทั้งหน้า)
     // ==========================
     document.addEventListener('DOMContentLoaded', function() {
       const content = document.getElementById('terms');
@@ -378,24 +359,37 @@
       const notice1 = document.getElementById('scrollNotice1');
 
       function unlockNext() {
+        if (!nextBtn.disabled) return;
         nextBtn.disabled = false;
         notice1.style.display = 'none';
+      }
+
+      function checkBottomInBox() {
+        const atBottom =
+          Math.ceil(content.scrollTop + content.clientHeight) >= content.scrollHeight;
+        if (atBottom) unlockNext();
+      }
+
+      function checkBottomVisibleOnPage() {
+        // ✅ FIX #2: ผู้ใช้เลื่อนทั้งหน้า ไม่ได้เลื่อนใน div
+        const rect = content.getBoundingClientRect();
+        const viewH = window.innerHeight || document.documentElement.clientHeight;
+        const bottomVisible = rect.bottom <= viewH + 4; // เผื่อ pixel
+        if (bottomVisible) unlockNext();
       }
 
       // กรณีเนื้อหาสั้นจนไม่ต้องเลื่อน
       if (content.scrollHeight <= content.clientHeight + 1) {
         unlockNext();
       } else {
-        content.addEventListener('scroll', function() {
-          const atBottom =
-            Math.ceil(content.scrollTop + content.clientHeight) >= content.scrollHeight;
-          if (atBottom) unlockNext();
-        }, { passive: true });
+        content.addEventListener('scroll', checkBottomInBox, { passive: true });
+        window.addEventListener('scroll', checkBottomVisibleOnPage, { passive: true });
+        window.addEventListener('resize', checkBottomVisibleOnPage, { passive: true });
       }
     });
 
     // ==========================
-    // STEP 2: แสดง PDF และต้อง scroll PDF ให้สุดก่อนกด "ยินยอม"
+    // STEP 2: PDF render + unlock เมื่อ scroll ถึงท้าย PDF
     // ==========================
     async function goToPdf() {
       document.getElementById('step1').style.display = 'none';
@@ -407,36 +401,30 @@
       const pagesWrap = document.getElementById('pdfPages');
       const loading = document.getElementById('pdfLoading');
 
-      // reset
       consentBtn.disabled = true;
       notice2.style.display = 'block';
       pagesWrap.innerHTML = '';
       loading.style.display = 'block';
 
       function unlockConsent() {
+        if (!consentBtn.disabled) return;
         consentBtn.disabled = false;
         notice2.style.display = 'none';
       }
 
-      // ลบ listener เก่าก่อน (กันกดกลับไปมาแล้วซ้อน)
-      const pdfBoxClone = pdfBox.cloneNode(true);
-      pdfBox.parentNode.replaceChild(pdfBoxClone, pdfBox);
+      // reset scroll position
+      pdfBox.scrollTop = 0;
 
-      // re-get หลัง clone
-      const box = document.getElementById('pdfBox');
-      const wrap = document.getElementById('pdfPages');
-
-      function attachPdfScrollCheck() {
-        if (box.scrollHeight <= box.clientHeight + 1) {
-          unlockConsent();
-          return;
-        }
-        box.addEventListener('scroll', function() {
-          const atBottom =
-            Math.ceil(box.scrollTop + box.clientHeight) >= box.scrollHeight;
-          if (atBottom) unlockConsent();
-        }, { passive: true });
+      // scroll check
+      function checkPdfBottom() {
+        const atBottom =
+          Math.ceil(pdfBox.scrollTop + pdfBox.clientHeight) >= pdfBox.scrollHeight;
+        if (atBottom) unlockConsent();
       }
+
+      // remove old listener (กันซ้อน)
+      pdfBox.onscroll = null;
+      pdfBox.addEventListener('scroll', checkPdfBottom, { passive: true });
 
       try {
         const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
@@ -444,32 +432,33 @@
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           const page = await pdf.getPage(pageNum);
 
-          const containerWidth = box.clientWidth - 28;
+          const containerWidth = pdfBox.clientWidth - 28;
           const viewport = page.getViewport({ scale: 1 });
           const scale = containerWidth / viewport.width;
           const scaledViewport = page.getViewport({ scale });
 
           const canvas = document.createElement('canvas');
           canvas.className = 'pdf-page';
-          const context = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d');
 
           canvas.width = Math.floor(scaledViewport.width);
           canvas.height = Math.floor(scaledViewport.height);
 
-          wrap.appendChild(canvas);
+          pagesWrap.appendChild(canvas);
 
-          await page.render({
-            canvasContext: context,
-            viewport: scaledViewport
-          }).promise;
+          await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
         }
 
         loading.style.display = 'none';
-        setTimeout(attachPdfScrollCheck, 50);
+
+        // ถ้า PDF สั้นจนไม่ต้อง scroll
+        setTimeout(() => {
+          if (pdfBox.scrollHeight <= pdfBox.clientHeight + 1) unlockConsent();
+        }, 80);
 
       } catch (err) {
         loading.style.display = 'none';
-        wrap.innerHTML = `
+        pagesWrap.innerHTML = `
           <div class="pdf-loading" style="color:#b91c1c;">
             ❌ โหลดเอกสาร PDF ไม่สำเร็จ<br>
             กรุณาตรวจสอบว่าไฟล์ <b>${PDF_URL}</b> อยู่ใน repo และ path ถูกต้อง (case-sensitive)
@@ -478,9 +467,6 @@
       }
     }
 
-    // ==========================
-    // ไปหน้า register.html
-    // ==========================
     function goToForm() {
       const button = document.getElementById('consentBtn');
       button.innerHTML = '⏳ กำลังดำเนินการ...';
