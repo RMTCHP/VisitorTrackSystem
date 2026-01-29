@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ข้อกำหนดและเงื่อนไข - RMT Visitor Track System</title>
 
-  <!-- PDF.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.js"></script>
+<!-- PDF.js (local) -->
+<script src="libs/pdfjs/pdf.min.js"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -450,8 +450,8 @@
     }
 
     // ✅ ตั้งค่า worker ตอนจะใช้จริง (กัน error ตอนโหลดช้า)
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.js";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "libs/pdfjs/pdf.worker.min.js";
+
 
     // reset scroll
     pdfBox.scrollTop = 0;
