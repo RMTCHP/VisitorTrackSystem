@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ข้อกำหนดและเงื่อนไข - RMT Visitor Track System</title>
+
+  <!-- PDF.js (render PDF เป็น canvas เพื่อให้ตรวจจับการ scroll ได้จริง) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.min.js"></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0097B2 0%, #ffffff 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    .header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      width: 100%;
+      max-width: 500px;
+      padding: 20px;
+      border-radius: 20px 20px 0 0;
+      text-align: center;
+      border-bottom: 3px solid #2c5282;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .company-logo {
+      height: 40px;
+      width: auto;
+    }
+
+    .company-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: #2c5282;
+      letter-spacing: 0.5px;
+    }
+
+    .main-container {
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      width: 100%;
+      max-width: 500px;
+      padding: 30px;
+      border-radius: 0 0 20px 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .main-container::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #2c5282, #3182ce, #4299e1);
+    }
+
+    .main-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 25px;
+      line-height: 1.4;
+    }
+
+    .content-text {
+      font-size: 15px;
+      color: #2d3748;
+      line-height: 1.8;
+      margin-bottom: 30px;
+      text-justify: inter-word;
+      background: #f7fafc;
+      padding: 24px 26px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      border-left: 4px solid #3182ce;
+      max-height: 350px;
+      overflow-y: auto;
+      white-space: normal;
+    }
+
+    /* ✅ จัดระยะบรรทัดและย่อหน้าให้เรียบ */
+    .content-text p,
+    .content-text li {
+      line-height: 1.75;
+      margin-bottom: 8px;
+      text-align: justify;
+      text-justify: inter-word;
+      word-break: break-word;
+    }
+
+    .content-text b {
+      display: block;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      color: #1e3a8a;
+      font-size: 15.5px;
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    .content-text ul {
+      margin-left: 2em;
+      padding-left: 0;
+    }
+
+    .content-text li::marker {
+      color: #2563eb;
+    }
+
+    .consent-button {
+      width: 100%;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(44, 82, 130, 0.3);
+      text-transform: none;
+      letter-spacing: 0.3px;
+    }
+
+    .consent-button:disabled {
+      background: #a0aec0 !important;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .consent-button:not(:disabled) {
+      background: linear-gradient(135deg, #2c5282 0%, #3182ce 100%);
+    }
+
+    .consent-button:not(:disabled):hover {
+      background: linear-gradient(135deg, #2a4c80 0%, #2c7cb8 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(44, 82, 130, 0.4);
+    }
+
+    .footer-info {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #718096;
+      text-align: center;
+    }
+
+    #scrollNotice1, #scrollNotice2 {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #b91c1c;
+      font-style: italic;
+      display: block;
+    }
+
+    /* ============ PDF VIEWER (Step 2) ============ */
+    .pdf-wrap {
+      background: #f7fafc;
+      border: 1px solid #ddd;
+      border-left: 4px solid #3182ce;
+      border-radius: 12px;
+      padding: 12px;
+      max-height: 350px;
+      overflow-y: auto;
+      margin-bottom: 30px;
+      text-align: left;
+    }
+
+    .pdf-page {
+      display: block;
+      width: 100%;
+      margin: 0 auto 12px auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    }
+
+    .pdf-loading {
+      font-size: 14px;
+      color: #475569;
+      padding: 10px 6px;
+    }
+
+    .step-badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e3a8a;
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      padding: 6px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+
+    /* Animation */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .header, .main-container { animation: fadeInUp 0.6s ease-out; }
+
+    /* 📱 Responsive */
+    @media (max-width: 480px) {
+      .main-container { padding: 20px 18px; }
+      .content-text { font-size: 14px; padding: 16px; line-height: 1.7; max-height: 320px; }
+      .pdf-wrap { max-height: 320px; }
+      .company-name { font-size: 18px; }
+      .consent-button { font-size: 15px; padding: 14px 18px; }
+      #scrollNotice1, #scrollNotice2 { font-size: 12px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <div class="logo-section">
+      <img src="logo.png" alt="Company Logo" class="company-logo">
+      <div class="company-name">RMT Visitor Track System</div>
+    </div>
+  </div>
+
+  <div class="main-container">
+    <h1 class="main-title">ข้อกำหนดและเงื่อนไข</h1>
+
+    <!-- ===== STEP 1: TEXT TERMS (เหมือนเดิม) ===== -->
+    <div id="step1">
+      <div class="step-badge">Step 1/2: อ่านเงื่อนไขเบื้องต้น</div>
+
+      <div class="content-text" id="terms">
+        <p>ข้อกำหนดและเงื่อนไขนี้จัดทำขึ้นเพื่อแจ้งต่อท่านในฐานะผู้มาติดต่อหรือบุคคลภายนอก ซึ่งไม่มีบัตรแสดงตัวตนของบริษัท เรโซแนค แมททีเรียลส์ (ประเทศไทย) จำกัด (“บริษัทฯ”) เกี่ยวกับการตั้งจุดตรวจสอบและการลงบันทึกรายละเอียดของผู้มาติดต่อหรือบุคคลภายนอกในการเข้ามายังพื้นที่ของบริษัทฯ และลงบันทึกการเข้า–ออกอาคารเพื่อดำเนินการกิจกรรมใด ๆ กับบริษัทฯ โดยมีวัตถุประสงค์เพื่อการยืนยันตัวตน การรักษาความปลอดภัยของอาคารและสถานที่ การปกป้องชีวิตและทรัพย์สิน และการป้องกันการกระทำผิดกฎหมายหรืออาชญากรรมอันอาจเกิดขึ้นในพื้นที่ของบริษัทฯ รวมถึงเพื่อการควบคุมโรค หรือเพื่อการปฏิบัติตามกฎหมายอื่นที่เกี่ยวข้อง ทั้งนี้ การที่ท่านเข้ามาในพื้นที่บริษัทฯ ถือเป็นการรับทราบประกาศนี้ โปรดระงับการเข้าพื้นที่ หากท่านไม่เห็นด้วยกับประกาศนี้ และหากยังคงเข้ามาในพื้นที่บริษัทฯ จะถือว่าท่านได้รับทราบประกาศนี้แล้ว</p>
+
+        <b>บทนิยาม</b>
+        <p>“ข้อมูลส่วนบุคคล” หมายความว่า ข้อมูลเกี่ยวกับบุคคลธรรมดาซึ่งทำให้สามารถระบุตัวบุคคลนั้นได้ ไม่ว่าทางตรงหรือทางอ้อม แต่ไม่รวมถึงข้อมูลของผู้ถึงแก่กรรมโดยเฉพาะ</p>
+        <p>“การประมวลผลข้อมูลส่วนบุคคล” หมายความว่า การเก็บรวบรวม ใช้ หรือเปิดเผยข้อมูลส่วนบุคคล</p>
+        <p>“ผู้มาติดต่อ” หมายความว่า บุคคลผู้มีกิจธุระกับบริษัทฯ ผู้บริหารหรือผู้ปฏิบัติงานในบริษัทฯ และมีความจำเป็นต้องเข้ามายังพื้นที่ของบริษัทฯ</p>
+
+        <b>1. ข้อมูลส่วนบุคคลทั่วไปที่เก็บรวบรวมโดยบริษัท เรโซแนค แมททีเรียลส์ (ประเทศไทย) จำกัด</b>
+        <p>บริษัทฯ ในฐานะเจ้าของพื้นที่ มีสิทธิในการเก็บรวบรวม ใช้ เปิดเผย โอน และประมวลผลข้อมูลส่วนบุคคลทั่วไป (“ข้อมูลส่วนบุคคลทั่วไป”) ของท่าน ดังต่อไปนี้:</p>
+        <ul>
+          <li>ชื่อ–นามสกุล</li>
+          <li>ภาพถ่าย</li>
+          <li>หมายเลขติดต่อ</li>
+          <li>บัตรประจำตัวประชาชน หรือใบขับขี่</li>
+          <li>เหตุผลของการเข้ามาติดต่อ</li>
+          <li>บันทึกกล้องโทรทัศน์วงจรปิด และข้อมูลอื่น ๆ ที่ได้รับจากสื่ออิเล็กทรอนิกส์ เช่น บันทึกข้อมูลการติดต่อ</li>
+        </ul>
+
+        <b>2. วัตถุประสงค์ในการประมวลผลข้อมูลส่วนบุคคลทั่วไป</b>
+        <p>บริษัทฯ จะเก็บรวบรวม ใช้ เปิดเผย โอน และประมวลผลข้อมูลส่วนบุคคลทั่วไปของท่านเพื่อวัตถุประสงค์ดังต่อไปนี้:</p>
+        <ul>
+          <li>เพื่อใช้เป็นข้อมูลในการยืนยันตัวตนสำหรับการเข้าพื้นที่ของบริษัทฯ</li>
+          <li>เพื่อรักษาความปลอดภัยและบริหารจัดการการเข้าพื้นที่ เช่น การยืนยันตัวตน หรือการสนับสนุนการทำงานของหน่วยงานที่เกี่ยวข้อง</li>
+          <li>เพื่อยืนยันตัวตนและอนุญาตการเข้า–ออกพื้นที่</li>
+          <li>เพื่อปกป้องทรัพย์สินและป้องกันอาชญากรรม</li>
+          <li>เพื่อการปฏิบัติตามกฎหมายและกระบวนการทางกฎหมาย เช่น การสอบสวน การร้องทุกข์ หรือการดำเนินคดีแพ่ง</li>
+          <li>เพื่อบริหารจัดการภายในองค์กร และปรับปรุงประสิทธิภาพในการดำเนินงาน</li>
+        </ul>
+
+        <b>3. ผลกระทบจากการที่บริษัทฯ ไม่ได้รับข้อมูลส่วนบุคคลทั่วไปของผู้เข้ามาติดต่อ</b>
+        <p>หากบริษัทฯ ไม่ได้รับข้อมูลส่วนบุคคลทั่วไปที่ได้ระบุไว้ข้างต้น บริษัทฯ จะไม่สามารถดำเนินการต่าง ๆ เพื่อบรรลุวัตถุประสงค์ดังกล่าวได้ รวมถึงจะไม่สามารถอนุญาตให้เข้าพื้นที่ของบริษัทฯ ได้</p>
+
+        <b>4. การเปิดเผยหรือโอนให้แก่บุคคลภายนอก</b>
+        <p>บริษัทฯ จะเก็บรักษาข้อมูลส่วนบุคคลทั่วไปของท่านไว้เป็นความลับ และจะไม่เปิดเผยแก่บุคคลภายนอก เว้นแต่มีความจำเป็นตามวัตถุประสงค์ดังต่อไปนี้:</p>
+        <ul>
+          <li>เพื่อปฏิบัติตามกฎหมาย หรือคำสั่งจากเจ้าหน้าที่ผู้มีอำนาจ</li>
+          <li>เพื่อดำเนินกระบวนการทางกฎหมายที่บริษัทฯ เป็นคู่กรณี หรือเพื่อการก่อตั้ง/ปกป้องสิทธิตามกฎหมาย</li>
+          <li>เพื่อป้องกันอันตรายหรือความเสียหายทางการเงิน รวมถึงกรณีที่เกี่ยวข้องกับการสอบสวนการกระทำผิด</li>
+          <li>ในกรณีการขายหรือโอนธุรกิจของบริษัทฯ เช่น การควบรวม กิจการ หรือการเลิกกิจการ</li>
+        </ul>
+
+        <p>บริษัทฯ อาจเปิดเผยหรือโอนข้อมูลส่วนบุคคลของท่านให้กับ:</p>
+        <ul>
+          <li>บริษัทในเครือหรือกลุ่มบริษัท</li>
+          <li>โรงพยาบาล</li>
+          <li>ผู้ให้บริการหรือคู่ค้าทางธุรกิจ</li>
+          <li>หน่วยงานของรัฐ (เช่น กรมสวัสดิการและคุ้มครองแรงงาน, สำนักงานประกันสังคม)</li>
+          <li>บุคคลอื่นตามที่กฎหมายกำหนด</li>
+        </ul>
+
+        <p>ในกรณีที่มีการโอนข้อมูลส่วนบุคคลออกนอกประเทศไทย บริษัทฯ จะปฏิบัติตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 รวมถึงกฎกระทรวงและประกาศอื่น ๆ ที่เกี่ยวข้อง</p>
+
+        <b>5. ระยะเวลาการเก็บรักษาข้อมูล</b>
+        <p>บริษัทฯ จะเก็บรักษาข้อมูลส่วนบุคคลทั่วไปของท่านไว้เป็นระยะเวลา 10 ปี หลังจากสิ้นสุดภาระผูกพันที่เกี่ยวข้องกับบริษัทฯ และจะดำเนินการทำลายข้อมูลเมื่อครบกำหนด โดยจะเก็บรักษาข้อมูลในระบบที่ปลอดภัยและเข้าถึงได้เฉพาะผู้ที่ได้รับอนุญาตเท่านั้น</p>
+
+        <b>6. สิทธิของท่านภายใต้พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล</b>
+        <p>สิทธิของท่านเป็นไปตามที่ระบุในพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562</p>
+
+        <b>7. ช่องทางการติดต่อ</b>
+        <p>
+          ผู้ควบคุมข้อมูลส่วนบุคคล<br>
+          ชื่อ : บริษัท เรโซแนค แมททีเรียลส์ (ประเทศไทย) จำกัด<br>
+          ที่อยู่ : 1/1 ถ.สุวินทวงศ์ ตำบลศาลาแดง อำเภอบางน้ำเปรี้ยว จังหวัดฉะเชิงเทรา 24150<br>
+          โทรศัพท์ : 0-3808-0230-57
+        </p>
+
+        <p><b>ข้าพเจ้าได้อ่านและเข้าใจในรายละเอียดข้างต้น</b>
+          เกี่ยวกับการเก็บรวบรวม ใช้ เปิดเผย โอน และประมวลผลข้อมูลส่วนบุคคลทั่วไปของข้าพเจ้า
+          และทราบถึงสิทธิต่าง ๆ ที่มีภายใต้พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
+          และกฎหมายอื่นที่เกี่ยวข้อง
+        </p>
+
+        <p style="margin-top:14px; font-size:14px; color:#1e3a8a;">
+          <b>อ้างอิง:</b> พระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562<br>
+          <a href="https://www.ratchakitcha.soc.go.th/DATA/PDF/2562/A/069/T_0052.PDF"
+             target="_blank"
+             rel="noopener noreferrer"
+             style="color:#2563eb; text-decoration:underline;">
+            https://www.ratchakitcha.soc.go.th/DATA/PDF/2562/A/069/T_0052.PDF
+          </a>
+        </p>
+      </div>
+
+      <!-- ปุ่ม Step1 -->
+      <button id="nextBtn" class="consent-button" onclick="goToPdf()" disabled>
+        หน้าถัดไป
+      </button>
+
+      <div id="scrollNotice1">⚠️ กรุณาเลื่อนอ่านเงื่อนไขจนสุดก่อนกดหน้าถัดไป</div>
+    </div>
+
+    <!-- ===== STEP 2: PDF VIEW ===== -->
+    <div id="step2" style="display:none;">
+      <div class="step-badge">Step 2/2: อ่านเอกสาร PDF ให้ครบก่อนยินยอม</div>
+
+      <div id="pdfBox" class="pdf-wrap">
+        <div class="pdf-loading" id="pdfLoading">⏳ กำลังโหลดเอกสาร PDF...</div>
+        <div id="pdfPages"></div>
+      </div>
+
+      <button id="consentBtn" class="consent-button" onclick="goToForm()" disabled>
+        ✅ ยินยอมและดำเนินการต่อ
+      </button>
+
+      <div id="scrollNotice2">⚠️ กรุณาเลื่อนอ่านเอกสาร PDF จนสุดก่อนกดยินยอม</div>
+    </div>
+
+    <div class="footer-info">
+      ระบบจัดการผู้เยี่ยมชม | Resonac Materials (Thailand) Co., Ltd.<br>
+      ข้อมูลของท่านจะได้รับการคุ้มครองตาม พ.ร.บ. PDPA 2562
+    </div>
+  </div>
+
+  <script>
+    // ==========================
+    // CONFIG
+    // ==========================
+    const PDF_URL = "data/policy-cn.pdf";
+
+    // PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.js";
+
+    // ==========================
+    // STEP 1: ต้อง scroll ข้อความให้สุดก่อนกด "หน้าถัดไป"
+    // ==========================
+    document.addEventListener('DOMContentLoaded', function() {
+      const content = document.getElementById('terms');
+      const nextBtn = document.getElementById('nextBtn');
+      const notice1 = document.getElementById('scrollNotice1');
+
+      function unlockNext() {
+        nextBtn.disabled = false;
+        notice1.style.display = 'none';
+      }
+
+      // กรณีเนื้อหาสั้นจนไม่ต้องเลื่อน
+      if (content.scrollHeight <= content.clientHeight + 1) {
+        unlockNext();
+      } else {
+        content.addEventListener('scroll', function() {
+          const atBottom =
+            Math.ceil(content.scrollTop + content.clientHeight) >= content.scrollHeight;
+          if (atBottom) unlockNext();
+        }, { passive: true });
+      }
+    });
+
+    // ==========================
+    // STEP 2: แสดง PDF และต้อง scroll PDF ให้สุดก่อนกด "ยินยอม"
+    // ==========================
+    async function goToPdf() {
+      document.getElementById('step1').style.display = 'none';
+      document.getElementById('step2').style.display = 'block';
+
+      const pdfBox = document.getElementById('pdfBox');
+      const consentBtn = document.getElementById('consentBtn');
+      const notice2 = document.getElementById('scrollNotice2');
+      const pagesWrap = document.getElementById('pdfPages');
+      const loading = document.getElementById('pdfLoading');
+
+      // reset
+      consentBtn.disabled = true;
+      notice2.style.display = 'block';
+      pagesWrap.innerHTML = '';
+      loading.style.display = 'block';
+
+      function unlockConsent() {
+        consentBtn.disabled = false;
+        notice2.style.display = 'none';
+      }
+
+      // ลบ listener เก่าก่อน (กันกดกลับไปมาแล้วซ้อน)
+      const pdfBoxClone = pdfBox.cloneNode(true);
+      pdfBox.parentNode.replaceChild(pdfBoxClone, pdfBox);
+
+      // re-get หลัง clone
+      const box = document.getElementById('pdfBox');
+      const wrap = document.getElementById('pdfPages');
+
+      function attachPdfScrollCheck() {
+        if (box.scrollHeight <= box.clientHeight + 1) {
+          unlockConsent();
+          return;
+        }
+        box.addEventListener('scroll', function() {
+          const atBottom =
+            Math.ceil(box.scrollTop + box.clientHeight) >= box.scrollHeight;
+          if (atBottom) unlockConsent();
+        }, { passive: true });
+      }
+
+      try {
+        const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+
+          const containerWidth = box.clientWidth - 28;
+          const viewport = page.getViewport({ scale: 1 });
+          const scale = containerWidth / viewport.width;
+          const scaledViewport = page.getViewport({ scale });
+
+          const canvas = document.createElement('canvas');
+          canvas.className = 'pdf-page';
+          const context = canvas.getContext('2d');
+
+          canvas.width = Math.floor(scaledViewport.width);
+          canvas.height = Math.floor(scaledViewport.height);
+
+          wrap.appendChild(canvas);
+
+          await page.render({
+            canvasContext: context,
+            viewport: scaledViewport
+          }).promise;
+        }
+
+        loading.style.display = 'none';
+        setTimeout(attachPdfScrollCheck, 50);
+
+      } catch (err) {
+        loading.style.display = 'none';
+        wrap.innerHTML = `
+          <div class="pdf-loading" style="color:#b91c1c;">
+            ❌ โหลดเอกสาร PDF ไม่สำเร็จ<br>
+            กรุณาตรวจสอบว่าไฟล์ <b>${PDF_URL}</b> อยู่ใน repo และ path ถูกต้อง (case-sensitive)
+          </div>
+        `;
+      }
+    }
+
+    // ==========================
+    // ไปหน้า register.html
+    // ==========================
+    function goToForm() {
+      const button = document.getElementById('consentBtn');
+      button.innerHTML = '⏳ กำลังดำเนินการ...';
+      button.disabled = true;
+      setTimeout(() => {
+        window.location.href = "register.html";
+      }, 800);
+    }
+  </script>
+</body>
+</html>
