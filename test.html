@@ -81,6 +81,7 @@
       color: #2d3748;
       line-height: 1.8;
       margin-bottom: 30px;
+      text-align: left;
       text-justify: inter-word;
       background: #f7fafc;
       padding: 24px 26px;
@@ -90,7 +91,6 @@
       max-height: 350px;
       overflow-y: auto;
       white-space: normal;
-      text-align: left;
     }
 
     .content-text p,
@@ -114,12 +114,6 @@
 
     .content-text ul { margin-left: 2em; padding-left: 0; }
     .content-text li::marker { color: #2563eb; }
-
-    /* ✅ sentinel ให้ observer จับง่าย */
-    #termsEnd {
-      height: 2px;
-      width: 100%;
-    }
 
     .consent-button {
       width: 100%;
@@ -167,6 +161,18 @@
       display: block;
     }
 
+    .step-badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e3a8a;
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      padding: 6px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+
     /* ============ PDF VIEWER (Step 2) ============ */
     .pdf-wrap {
       background: #f7fafc;
@@ -190,18 +196,6 @@
     }
 
     .pdf-loading { font-size: 14px; color: #475569; padding: 10px 6px; }
-
-    .step-badge {
-      display: inline-block;
-      font-size: 12px;
-      font-weight: 700;
-      color: #1e3a8a;
-      background: #e0f2fe;
-      border: 1px solid #bae6fd;
-      padding: 6px 10px;
-      border-radius: 999px;
-      margin-bottom: 10px;
-    }
 
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(30px); }
@@ -317,9 +311,6 @@
             https://www.ratchakitcha.soc.go.th/DATA/PDF/2562/A/069/T_0052.PDF
           </a>
         </p>
-
-        <!-- ✅ จุดท้ายสุดสำหรับปลดล็อคปุ่ม -->
-        <div id="termsEnd"></div>
       </div>
 
       <button id="nextBtn" class="consent-button" onclick="goToPdf()" disabled>
@@ -358,46 +349,32 @@
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.js";
 
     // ==========================
-    // STEP 1: ปลดล็อคปุ่มด้วย IntersectionObserver (ชัวร์กว่าเช็ค scrollTop)
+    // STEP 1 unlock (logic แบบโค้ดเก่า 100%)
     // ==========================
     document.addEventListener('DOMContentLoaded', function() {
       const content = document.getElementById('terms');
-      const endEl = document.getElementById('termsEnd');
       const nextBtn = document.getElementById('nextBtn');
       const notice1 = document.getElementById('scrollNotice1');
 
       function unlockNext() {
-        if (!nextBtn.disabled) return;
         nextBtn.disabled = false;
         notice1.style.display = 'none';
       }
 
-      // ถ้าไม่ต้อง scroll (เนื้อหาสั้น)
-      if (content.scrollHeight <= content.clientHeight + 2) {
-        unlockNext();
-        return;
-      }
+      // ✅ กันเคสเนื้อหาสั้น (ไม่เกิด scroll event)
+      setTimeout(() => {
+        if (content.scrollHeight <= content.clientHeight + 1) unlockNext();
+      }, 50);
 
-      // ✅ วิธีหลัก: observer จับว่ามองเห็น "ท้ายสุด" ภายในกล่องหรือยัง
-      if ('IntersectionObserver' in window) {
-        const io = new IntersectionObserver((entries) => {
-          if (entries.some(e => e.isIntersecting)) unlockNext();
-        }, {
-          root: content,
-          threshold: 0.98
-        });
-        io.observe(endEl);
-      }
-
-      // ✅ Fallback: เผื่อบาง browser แปลก ๆ
-      content.addEventListener('scroll', () => {
-        const atBottom = (content.scrollTop + content.clientHeight) >= (content.scrollHeight - 2);
-        if (atBottom) unlockNext();
+      content.addEventListener('scroll', function() {
+        const scrollBottom = content.scrollTop + content.clientHeight;
+        const isAtBottom = scrollBottom >= content.scrollHeight - 10;
+        if (isAtBottom) unlockNext();
       }, { passive: true });
     });
 
     // ==========================
-    // STEP 2: PDF render + unlock เมื่อ scroll ถึงท้าย PDF
+    // STEP 2: PDF render + unlock (logic แบบโค้ดเก่า 100%)
     // ==========================
     async function goToPdf() {
       document.getElementById('step1').style.display = 'none';
@@ -415,21 +392,23 @@
       loading.style.display = 'block';
 
       function unlockConsent() {
-        if (!consentBtn.disabled) return;
         consentBtn.disabled = false;
         notice2.style.display = 'none';
       }
 
+      // reset scroll
       pdfBox.scrollTop = 0;
 
-      function checkPdfBottom() {
-        const atBottom =
-          Math.ceil(pdfBox.scrollTop + pdfBox.clientHeight) >= pdfBox.scrollHeight;
-        if (atBottom) unlockConsent();
+      // ✅ logic แบบโค้ดเก่า
+      function onPdfScroll() {
+        const scrollBottom = pdfBox.scrollTop + pdfBox.clientHeight;
+        const isAtBottom = scrollBottom >= pdfBox.scrollHeight - 10;
+        if (isAtBottom) unlockConsent();
       }
 
-      pdfBox.onscroll = null;
-      pdfBox.addEventListener('scroll', checkPdfBottom, { passive: true });
+      // กัน listener ซ้อน
+      pdfBox.removeEventListener('scroll', onPdfScroll);
+      pdfBox.addEventListener('scroll', onPdfScroll, { passive: true });
 
       try {
         const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
@@ -450,14 +429,16 @@
           canvas.height = Math.floor(scaledViewport.height);
 
           pagesWrap.appendChild(canvas);
+
           await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
         }
 
         loading.style.display = 'none';
 
+        // ✅ กันเคส PDF สั้น (ไม่ต้อง scroll)
         setTimeout(() => {
-          if (pdfBox.scrollHeight <= pdfBox.clientHeight + 2) unlockConsent();
-        }, 100);
+          if (pdfBox.scrollHeight <= pdfBox.clientHeight + 1) unlockConsent();
+        }, 120);
 
       } catch (err) {
         loading.style.display = 'none';
