@@ -90,8 +90,6 @@
       max-height: 350px;
       overflow-y: auto;
       white-space: normal;
-
-      /* ✅ FIX #1: ชิดซ้ายแน่นอน (ไม่โดน text-align:center ของ main-container) */
       text-align: left;
     }
 
@@ -116,6 +114,12 @@
 
     .content-text ul { margin-left: 2em; padding-left: 0; }
     .content-text li::marker { color: #2563eb; }
+
+    /* ✅ sentinel ให้ observer จับง่าย */
+    #termsEnd {
+      height: 2px;
+      width: 100%;
+    }
 
     .consent-button {
       width: 100%;
@@ -313,6 +317,9 @@
             https://www.ratchakitcha.soc.go.th/DATA/PDF/2562/A/069/T_0052.PDF
           </a>
         </p>
+
+        <!-- ✅ จุดท้ายสุดสำหรับปลดล็อคปุ่ม -->
+        <div id="termsEnd"></div>
       </div>
 
       <button id="nextBtn" class="consent-button" onclick="goToPdf()" disabled>
@@ -351,10 +358,11 @@
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.js";
 
     // ==========================
-    // STEP 1 unlock (รองรับทั้ง scroll ในกล่อง และ scroll ทั้งหน้า)
+    // STEP 1: ปลดล็อคปุ่มด้วย IntersectionObserver (ชัวร์กว่าเช็ค scrollTop)
     // ==========================
     document.addEventListener('DOMContentLoaded', function() {
       const content = document.getElementById('terms');
+      const endEl = document.getElementById('termsEnd');
       const nextBtn = document.getElementById('nextBtn');
       const notice1 = document.getElementById('scrollNotice1');
 
@@ -364,28 +372,28 @@
         notice1.style.display = 'none';
       }
 
-      function checkBottomInBox() {
-        const atBottom =
-          Math.ceil(content.scrollTop + content.clientHeight) >= content.scrollHeight;
-        if (atBottom) unlockNext();
-      }
-
-      function checkBottomVisibleOnPage() {
-        // ✅ FIX #2: ผู้ใช้เลื่อนทั้งหน้า ไม่ได้เลื่อนใน div
-        const rect = content.getBoundingClientRect();
-        const viewH = window.innerHeight || document.documentElement.clientHeight;
-        const bottomVisible = rect.bottom <= viewH + 4; // เผื่อ pixel
-        if (bottomVisible) unlockNext();
-      }
-
-      // กรณีเนื้อหาสั้นจนไม่ต้องเลื่อน
-      if (content.scrollHeight <= content.clientHeight + 1) {
+      // ถ้าไม่ต้อง scroll (เนื้อหาสั้น)
+      if (content.scrollHeight <= content.clientHeight + 2) {
         unlockNext();
-      } else {
-        content.addEventListener('scroll', checkBottomInBox, { passive: true });
-        window.addEventListener('scroll', checkBottomVisibleOnPage, { passive: true });
-        window.addEventListener('resize', checkBottomVisibleOnPage, { passive: true });
+        return;
       }
+
+      // ✅ วิธีหลัก: observer จับว่ามองเห็น "ท้ายสุด" ภายในกล่องหรือยัง
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          if (entries.some(e => e.isIntersecting)) unlockNext();
+        }, {
+          root: content,
+          threshold: 0.98
+        });
+        io.observe(endEl);
+      }
+
+      // ✅ Fallback: เผื่อบาง browser แปลก ๆ
+      content.addEventListener('scroll', () => {
+        const atBottom = (content.scrollTop + content.clientHeight) >= (content.scrollHeight - 2);
+        if (atBottom) unlockNext();
+      }, { passive: true });
     });
 
     // ==========================
@@ -412,17 +420,14 @@
         notice2.style.display = 'none';
       }
 
-      // reset scroll position
       pdfBox.scrollTop = 0;
 
-      // scroll check
       function checkPdfBottom() {
         const atBottom =
           Math.ceil(pdfBox.scrollTop + pdfBox.clientHeight) >= pdfBox.scrollHeight;
         if (atBottom) unlockConsent();
       }
 
-      // remove old listener (กันซ้อน)
       pdfBox.onscroll = null;
       pdfBox.addEventListener('scroll', checkPdfBottom, { passive: true });
 
@@ -445,16 +450,14 @@
           canvas.height = Math.floor(scaledViewport.height);
 
           pagesWrap.appendChild(canvas);
-
           await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
         }
 
         loading.style.display = 'none';
 
-        // ถ้า PDF สั้นจนไม่ต้อง scroll
         setTimeout(() => {
-          if (pdfBox.scrollHeight <= pdfBox.clientHeight + 1) unlockConsent();
-        }, 80);
+          if (pdfBox.scrollHeight <= pdfBox.clientHeight + 2) unlockConsent();
+        }, 100);
 
       } catch (err) {
         loading.style.display = 'none';
