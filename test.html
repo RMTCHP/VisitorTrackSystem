@@ -91,6 +91,7 @@
       max-height: 350px;
       overflow-y: auto;
       white-space: normal;
+      -webkit-overflow-scrolling: touch; /* ✅ ช่วย iOS/มือถือ */
     }
 
     .content-text p,
@@ -184,6 +185,7 @@
       overflow-y: auto;
       margin-bottom: 30px;
       text-align: left;
+      -webkit-overflow-scrolling: touch;
     }
 
     .pdf-page {
@@ -230,6 +232,7 @@
       <div class="step-badge">Step 1/2: อ่านเงื่อนไขเบื้องต้น</div>
 
       <div class="content-text" id="terms">
+        <!-- (เนื้อหาของคุณเหมือนเดิมทั้งหมด) -->
         <p>ข้อกำหนดและเงื่อนไขนี้จัดทำขึ้นเพื่อแจ้งต่อท่านในฐานะผู้มาติดต่อหรือบุคคลภายนอก ซึ่งไม่มีบัตรแสดงตัวตนของบริษัท เรโซแนค แมททีเรียลส์ (ประเทศไทย) จำกัด (“บริษัทฯ”) เกี่ยวกับการตั้งจุดตรวจสอบและการลงบันทึกรายละเอียดของผู้มาติดต่อหรือบุคคลภายนอกในการเข้ามายังพื้นที่ของบริษัทฯ และลงบันทึกการเข้า–ออกอาคารเพื่อดำเนินการกิจกรรมใด ๆ กับบริษัทฯ โดยมีวัตถุประสงค์เพื่อการยืนยันตัวตน การรักษาความปลอดภัยของอาคารและสถานที่ การปกป้องชีวิตและทรัพย์สิน และการป้องกันการกระทำผิดกฎหมายหรืออาชญากรรมอันอาจเกิดขึ้นในพื้นที่ของบริษัทฯ รวมถึงเพื่อการควบคุมโรค หรือเพื่อการปฏิบัติตามกฎหมายอื่นที่เกี่ยวข้อง ทั้งนี้ การที่ท่านเข้ามาในพื้นที่บริษัทฯ ถือเป็นการรับทราบประกาศนี้ โปรดระงับการเข้าพื้นที่ หากท่านไม่เห็นด้วยกับประกาศนี้ และหากยังคงเข้ามาในพื้นที่บริษัทฯ จะถือว่าท่านได้รับทราบประกาศนี้แล้ว</p>
 
         <b>บทนิยาม</b>
@@ -348,34 +351,60 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.js";
 
-    // ==========================
-    // STEP 1 unlock (logic แบบโค้ดเก่า 100%)
-    // ==========================
+    // =========================================================
+    // STEP 1 unlock (logic โค้ดเก่า + เพิ่ม event/interval กันหลุด)
+    // =========================================================
     document.addEventListener('DOMContentLoaded', function() {
       const content = document.getElementById('terms');
       const nextBtn = document.getElementById('nextBtn');
       const notice1 = document.getElementById('scrollNotice1');
 
+      let unlocked = false;
+      let termsTimer = null;
+
       function unlockNext() {
+        if (unlocked) return;
+        unlocked = true;
         nextBtn.disabled = false;
         notice1.style.display = 'none';
+        if (termsTimer) clearInterval(termsTimer);
       }
 
-      // ✅ กันเคสเนื้อหาสั้น (ไม่เกิด scroll event)
-      setTimeout(() => {
-        if (content.scrollHeight <= content.clientHeight + 1) unlockNext();
-      }, 50);
+      // ✅ logic แบบโค้ดเก่า
+      function checkTermsBottom() {
+        // กันกรณี element ยังไม่พร้อม
+        if (!content) return;
 
-      content.addEventListener('scroll', function() {
         const scrollBottom = content.scrollTop + content.clientHeight;
         const isAtBottom = scrollBottom >= content.scrollHeight - 10;
-        if (isAtBottom) unlockNext();
-      }, { passive: true });
+
+        // กันเคสเนื้อหาสั้น (ไม่ต้อง scroll)
+        const noScrollNeeded = content.scrollHeight <= content.clientHeight + 1;
+
+        if (isAtBottom || noScrollNeeded) unlockNext();
+      }
+
+      // เรียกทันที + หลัง layout settle
+      checkTermsBottom();
+      setTimeout(checkTermsBottom, 50);
+      setTimeout(checkTermsBottom, 250);
+
+      // ฟังหลาย event เผื่อมือถือบางรุ่น scroll ไม่ยิง
+      content.addEventListener('scroll', checkTermsBottom, { passive: true });
+      content.addEventListener('touchmove', checkTermsBottom, { passive: true });
+      content.addEventListener('touchend', checkTermsBottom, { passive: true });
+      content.addEventListener('wheel', checkTermsBottom, { passive: true });
+      content.addEventListener('keyup', checkTermsBottom, { passive: true });
+
+      // ✅ safety net: ตรวจซ้ำเป็นช่วง ๆ จนกว่าจะปลดล็อค
+      termsTimer = setInterval(checkTermsBottom, 200);
     });
 
-    // ==========================
-    // STEP 2: PDF render + unlock (logic แบบโค้ดเก่า 100%)
-    // ==========================
+    // =========================================================
+    // STEP 2: PDF render + unlock (ใช้ logic โค้ดเก่า 100%)
+    // =========================================================
+    let pdfScrollHandler = null;
+
     async function goToPdf() {
       document.getElementById('step1').style.display = 'none';
       document.getElementById('step2').style.display = 'block';
@@ -399,16 +428,16 @@
       // reset scroll
       pdfBox.scrollTop = 0;
 
+      // remove old listener (ต้องใช้ reference เดิม)
+      if (pdfScrollHandler) pdfBox.removeEventListener('scroll', pdfScrollHandler);
+
       // ✅ logic แบบโค้ดเก่า
-      function onPdfScroll() {
+      pdfScrollHandler = function() {
         const scrollBottom = pdfBox.scrollTop + pdfBox.clientHeight;
         const isAtBottom = scrollBottom >= pdfBox.scrollHeight - 10;
         if (isAtBottom) unlockConsent();
-      }
-
-      // กัน listener ซ้อน
-      pdfBox.removeEventListener('scroll', onPdfScroll);
-      pdfBox.addEventListener('scroll', onPdfScroll, { passive: true });
+      };
+      pdfBox.addEventListener('scroll', pdfScrollHandler, { passive: true });
 
       try {
         const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
@@ -438,7 +467,7 @@
         // ✅ กันเคส PDF สั้น (ไม่ต้อง scroll)
         setTimeout(() => {
           if (pdfBox.scrollHeight <= pdfBox.clientHeight + 1) unlockConsent();
-        }, 120);
+        }, 150);
 
       } catch (err) {
         loading.style.display = 'none';
