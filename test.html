@@ -344,16 +344,11 @@
       ข้อมูลของท่านจะได้รับการคุ้มครองตาม พ.ร.บ. PDPA 2562
     </div>
   </div>
-
 <script>
   const PDF_URL = "data/policy-cn.pdf";
 
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.js";
-
   // ==========================
   // STEP 1 unlock (NO event dependency)
-  // ใช้ logic แบบโค้ดเก่า + rAF loop
   // ==========================
   let step1Unlocked = false;
   let step1RafId = null;
@@ -387,23 +382,19 @@
   }
 
   function startStep1Watcher() {
-    // กันซ้อน
     if (step1RafId) cancelAnimationFrame(step1RafId);
 
     const loop = () => {
-      // ถ้า Step1 ถูกซ่อนแล้ว ให้หยุดตรวจทันที
       const step1 = document.getElementById('step1');
       if (!step1 || step1.style.display === 'none' || step1Unlocked) {
         if (step1RafId) cancelAnimationFrame(step1RafId);
         step1RafId = null;
         return;
       }
-
       checkTermsBottom();
       step1RafId = requestAnimationFrame(loop);
     };
 
-    // ตรวจทันที + รอ layout settle
     checkTermsBottom();
     setTimeout(checkTermsBottom, 100);
     setTimeout(checkTermsBottom, 300);
@@ -411,19 +402,16 @@
     step1RafId = requestAnimationFrame(loop);
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
-    startStep1Watcher();
-  });
+  window.addEventListener('load', startStep1Watcher);
 
   // ==========================
-  // STEP 2: PDF render + unlock (logic โค้ดเก่า)
-  // + stop watcher ของ Step1 เพื่อไม่ “จับทั้ง 2 หน้า”
+  // STEP 2: PDF render + unlock
   // ==========================
   let pdfScrollHandler = null;
   let step2Unlocked = false;
 
   async function goToPdf() {
-    // ✅ หยุดการตรวจ Step1 ทันที (ตัดปัญหาจับ 2 หน้า)
+    // ✅ หยุด watcher Step1 แน่นอน
     if (step1RafId) cancelAnimationFrame(step1RafId);
     step1RafId = null;
 
@@ -449,10 +437,26 @@
       notice2.style.display = 'none';
     }
 
+    // ✅ เช็ค PDF.js พร้อมไหมก่อน
+    if (!window.pdfjsLib) {
+      loading.style.display = 'none';
+      pagesWrap.innerHTML = `
+        <div class="pdf-loading" style="color:#b91c1c;">
+          ❌ ไม่สามารถโหลด PDF.js ได้ (CDN ไม่พร้อม/ถูกบล็อค)<br>
+          กรุณาลองรีเฟรช หรือใช้งานผ่าน Chrome ปกติ
+        </div>
+      `;
+      return;
+    }
+
+    // ✅ ตั้งค่า worker ตอนจะใช้จริง (กัน error ตอนโหลดช้า)
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.js";
+
     // reset scroll
     pdfBox.scrollTop = 0;
 
-    // remove old scroll listener (ต้องใช้ reference เดิม)
+    // remove old scroll listener
     if (pdfScrollHandler) pdfBox.removeEventListener('scroll', pdfScrollHandler);
 
     // ✅ logic แบบโค้ดเก่า
@@ -482,13 +486,12 @@
         canvas.height = Math.floor(scaledViewport.height);
 
         pagesWrap.appendChild(canvas);
-
         await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
       }
 
       loading.style.display = 'none';
 
-      // ✅ กันเคส PDF สั้น (ไม่ต้อง scroll)
+      // ✅ กันเคส PDF สั้น
       setTimeout(() => {
         if (pdfBox.scrollHeight <= pdfBox.clientHeight + 1) unlockConsent();
       }, 200);
@@ -498,9 +501,10 @@
       pagesWrap.innerHTML = `
         <div class="pdf-loading" style="color:#b91c1c;">
           ❌ โหลดเอกสาร PDF ไม่สำเร็จ<br>
-          กรุณาตรวจสอบว่าไฟล์ <b>${PDF_URL}</b> อยู่ใน repo และ path ถูกต้อง (case-sensitive)
+          กรุณาตรวจสอบไฟล์ <b>${PDF_URL}</b> และ path ให้ถูกต้อง
         </div>
       `;
+      console.error(err);
     }
   }
 
@@ -513,5 +517,6 @@
     }, 800);
   }
 </script>
+
 </body>
 </html>
