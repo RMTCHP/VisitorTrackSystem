@@ -195,6 +195,7 @@
       background: white;
       border-radius: 8px;
       box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+      image-rendering: auto;
     }
 
     .pdf-loading { font-size: 14px; color: #475569; padding: 10px 6px; }
@@ -470,24 +471,46 @@
     try {
       const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
 
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
+for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+  const page = await pdf.getPage(pageNum);
 
-        const containerWidth = pdfBox.clientWidth - 28;
-        const viewport = page.getViewport({ scale: 1 });
-        const scale = containerWidth / viewport.width;
-        const scaledViewport = page.getViewport({ scale });
+  const containerWidth = pdfBox.clientWidth - 28; // เผื่อ padding
+  const viewport1 = page.getViewport({ scale: 1 });
 
-        const canvas = document.createElement('canvas');
-        canvas.className = 'pdf-page';
-        const ctx = canvas.getContext('2d');
+  // scale ให้พอดีความกว้าง container
+  const scale = containerWidth / viewport1.width;
 
-        canvas.width = Math.floor(scaledViewport.width);
-        canvas.height = Math.floor(scaledViewport.height);
+  // ✅ Hi-DPI: คูณความละเอียดตามจอ (จำกัดไว้กันเครื่องช้า)
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-        pagesWrap.appendChild(canvas);
-        await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
-      }
+  // viewport ที่ใช้วาดจริง (คูณ dpr)
+  const viewport = page.getViewport({ scale: scale * dpr });
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'pdf-page';
+
+  // ขนาด canvas จริง (pixel)
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+
+  // ขนาดที่แสดงบนหน้าจอ (CSS px) — ทำให้ “คมแต่ไม่ใหญ่เกิน”
+  canvas.style.width = Math.floor(viewport.width / dpr) + "px";
+  canvas.style.height = Math.floor(viewport.height / dpr) + "px";
+
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  // ✅ บางเบราว์เซอร์ช่วยคมขึ้นอีกนิด
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  pagesWrap.appendChild(canvas);
+
+  await page.render({
+    canvasContext: ctx,
+    viewport: viewport
+  }).promise;
+}
+
 
       loading.style.display = 'none';
 
