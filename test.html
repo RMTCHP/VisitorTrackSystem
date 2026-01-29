@@ -345,14 +345,26 @@
     </div>
   </div>
 
- <script>
+<script>
     const PDF_URL = "data/policy-cn.pdf";
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.js";
+    // ✅ รอให้ PDF.js โหลดเสร็จก่อน
+    function waitForPdfJs(callback) {
+      if (typeof pdfjsLib !== 'undefined') {
+        callback();
+      } else {
+        setTimeout(() => waitForPdfJs(callback), 100);
+      }
+    }
+
+    // ตั้งค่า worker เมื่อ PDF.js พร้อม
+    waitForPdfJs(() => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.js";
+    });
 
     // =========================================================
-    // STEP 1 unlock - ปรับปรุงให้ทำงานได้ดีขึ้น
+    // STEP 1 unlock
     // =========================================================
     document.addEventListener('DOMContentLoaded', function() {
       const content = document.getElementById('terms');
@@ -382,13 +394,9 @@
         const clientHeight = content.clientHeight;
         const scrollBottom = scrollTop + clientHeight;
 
-        // เพิ่ม tolerance ให้มากขึ้น (20px แทน 10px)
         const isAtBottom = scrollBottom >= scrollHeight - 20;
-        
-        // กรณีเนื้อหาสั้น ไม่ต้อง scroll
         const noScrollNeeded = scrollHeight <= clientHeight + 5;
 
-        // Debug log
         console.log('📊 Scroll Check:', {
           scrollTop,
           scrollHeight,
@@ -403,12 +411,10 @@
         }
       }
 
-      // เรียกตรวจสอบทันทีและหลัง DOM พร้อม
       setTimeout(() => checkTermsBottom(), 100);
       setTimeout(() => checkTermsBottom(), 300);
       setTimeout(() => checkTermsBottom(), 500);
 
-      // ฟัง events - ใช้ผ่าน wrapper function เดียว
       const scrollHandler = () => {
         if (!unlocked) checkTermsBottom();
       };
@@ -418,12 +424,10 @@
       content.addEventListener('touchend', scrollHandler, { passive: true });
       content.addEventListener('wheel', scrollHandler, { passive: true });
 
-      // Safety net: ตรวจซ้ำทุก 300ms จนกว่าจะปลดล็อค
       termsTimer = setInterval(() => {
         if (!unlocked) checkTermsBottom();
       }, 300);
 
-      // ⚠️ Emergency unlock หลัง 3 วินาที (กรณีมีปัญหา)
       setTimeout(() => {
         if (!unlocked) {
           console.warn('⏰ Auto-unlock หลัง 3 วินาที');
@@ -462,15 +466,12 @@
         console.log('✅ ปลดล็อกปุ่มยินยอมแล้ว');
       }
 
-      // Reset scroll
       pdfBox.scrollTop = 0;
 
-      // Remove old listener
       if (pdfScrollHandler) {
         pdfBox.removeEventListener('scroll', pdfScrollHandler);
       }
 
-      // PDF scroll handler
       pdfScrollHandler = function() {
         if (pdfUnlocked) return;
         
@@ -495,50 +496,53 @@
       pdfBox.addEventListener('scroll', pdfScrollHandler, { passive: true });
       pdfBox.addEventListener('touchend', pdfScrollHandler, { passive: true });
 
-      try {
-        const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+      // ✅ รอให้ PDF.js พร้อมก่อนใช้งาน
+      waitForPdfJs(async () => {
+        try {
+          const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
 
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-          const page = await pdf.getPage(pageNum);
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
 
-          const containerWidth = pdfBox.clientWidth - 28;
-          const viewport = page.getViewport({ scale: 1 });
-          const scale = containerWidth / viewport.width;
-          const scaledViewport = page.getViewport({ scale });
+            const containerWidth = pdfBox.clientWidth - 28;
+            const viewport = page.getViewport({ scale: 1 });
+            const scale = containerWidth / viewport.width;
+            const scaledViewport = page.getViewport({ scale });
 
-          const canvas = document.createElement('canvas');
-          canvas.className = 'pdf-page';
-          const ctx = canvas.getContext('2d');
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-page';
+            const ctx = canvas.getContext('2d');
 
-          canvas.width = Math.floor(scaledViewport.width);
-          canvas.height = Math.floor(scaledViewport.height);
+            canvas.width = Math.floor(scaledViewport.width);
+            canvas.height = Math.floor(scaledViewport.height);
 
-          pagesWrap.appendChild(canvas);
+            pagesWrap.appendChild(canvas);
 
-          await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
-        }
-
-        loading.style.display = 'none';
-
-        // ตรวจสอบว่า PDF สั้นหรือไม่
-        setTimeout(() => {
-          const noScrollNeeded = pdfBox.scrollHeight <= pdfBox.clientHeight + 5;
-          if (noScrollNeeded) {
-            console.log('📄 PDF สั้น ไม่ต้อง scroll');
-            unlockConsent();
+            await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
           }
-        }, 200);
 
-      } catch (err) {
-        console.error('PDF Error:', err);
-        loading.style.display = 'none';
-        pagesWrap.innerHTML = `
-          <div class="pdf-loading" style="color:#b91c1c;">
-            ❌ โหลดเอกสาร PDF ไม่สำเร็จ<br>
-            กรุณาตรวจสอบว่าไฟล์ <b>${PDF_URL}</b> อยู่ใน repo และ path ถูกต้อง
-          </div>
-        `;
-      }
+          loading.style.display = 'none';
+
+          setTimeout(() => {
+            const noScrollNeeded = pdfBox.scrollHeight <= pdfBox.clientHeight + 5;
+            if (noScrollNeeded) {
+              console.log('📄 PDF สั้น ไม่ต้อง scroll');
+              unlockConsent();
+            }
+          }, 200);
+
+        } catch (err) {
+          console.error('PDF Error:', err);
+          loading.style.display = 'none';
+          pagesWrap.innerHTML = `
+            <div class="pdf-loading" style="color:#b91c1c;">
+              ❌ โหลดเอกสาร PDF ไม่สำเร็จ<br>
+              Error: ${err.message}<br>
+              กรุณาตรวจสอบว่าไฟล์ <b>${PDF_URL}</b> มีอยู่จริง
+            </div>
+          `;
+        }
+      });
     }
 
     function goToForm() {
